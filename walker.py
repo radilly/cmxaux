@@ -1,10 +1,22 @@
 #!/usr/bin/python3
 
+# NOTE:
+# NOTE: See if this might be useful to others...
+# NOTE: https://cumulus.hosiene.co.uk/ucp.php?i=pm&mode=view&p=26041
+# NOTE:
+#
+# NOTE: https://opensource.com/article/18/8/diffs-patches
+#       Could we use patching to copy local updates to an install image??
+#
 # https://www.tutorialspoint.com/python/os_walk.htm
+# ----------------------------------------------------------------------------------------
 import os
 import hashlib
 import stat
+import argparse
+import re
 
+# ----------------------------------------------------------------------------------------
 # https://stackoverflow.com/questions/46605842/executing-bashs-complex-find-command-in-python-shell
 # os.walk()
 
@@ -21,7 +33,9 @@ import stat
 #    File "/usr/lib/python3.7/codecs.py", line 322, in decode
 #      (result, consumed) = self._buffer_decode(data, self.errors, final)
 #  UnicodeDecodeError: 'utf-8' codec can't decode byte 0x94 in position 3: invalid start byte
+# ----------------------------------------------------------------------------------------
 
+list = []
 
 
 def compute_md5( file_name ):
@@ -38,17 +52,62 @@ def compute_md5( file_name ):
 
 
 
-for root, dirs, files in os.walk(".", topdown=False):
+# ----------------------------------------------------------------------------------------
+#
+# Option to output HTML???
+#   https://docs.python.org/2/howto/argparse.html
+#   http://zetcode.com/python/argparse/
+#
+#
+# ----------------------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------------------
+#   https://docs.python.org/2/howto/argparse.html
+# ----------------------------------------------------------------------------------------
+parser = argparse.ArgumentParser()
+#>>>>> parser.add_argument("infile", help="Contains a list of log file to check, and optionally a time threshhold")
+parser.add_argument("refdir", help="Path to the directory we will use as the reference.")
+parser.add_argument("chkdir", help="Path to the directory we will compare to the reference.")
+parser.add_argument("--html", help="Output in HTML", action="store_true")
+args = parser.parse_args()
+#	print args.infile
+#	if args.html:
+#		print "html turned on"
+if not args.html:
+	print( "\n\n\n\n\n" )
+
+use_html = args.html
+
+#>>>>> infile = args.infile
+
+
+reflength = str(len(args.refdir) + 1)
+
+for root, dirs, files in os.walk(args.refdir, topdown=False):
 	print( "# dir {}".format( root ) )
 	for name in files:
 		filepath = os.path.join(root, name)
 #		size = filepath.stat().st_size
 		size = os.stat(filepath).st_size
-		print( "{} {} {}".format( filepath, compute_md5(filepath), size ) )
+		md5 = compute_md5(filepath)
+#		print( "DEBUG: {} {} {}".format( filepath, md5, size ) )
+# @@@
+		if len(root) - len(args.refdir) > 0 :
+			short_fp = os.path.join( re.sub("^.{" + reflength + "}", "", root), name )
+		else :
+			short_fp = name
+
+#		print( " root = {}  name = {}".format( re.sub("^.\{{}\}".format( len(root)), "", root), name ) )
+#		print( " root = {}  name = {}".format( re.sub("^.{" + str(len(args.refdir)) + "}", "", root), name ) )
+		print( "DEBUG: root = {}   name = {}   short_fp = {}".format( re.sub("^.{" + reflength + "}", "", root), name, short_fp ) )
+
+		print( "{} {} {}".format( short_fp, md5, size ) )
+		list.append( "{} {} {}".format( short_fp, md5, size ) )
 #		print( "{} | {} | {}".format( filepath, compute_md5(filepath), size ) )
 
 #		print( compute_md5( os.path.join(root, name)) )
 
+	print( "Found {} files.".format( len(list) ) )
 
 exit()
 
