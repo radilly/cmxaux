@@ -83,6 +83,8 @@ def add_member( dict_name, key_str, value_str ) :
 
 # ----------------------------------------------------------------------------------------
 #
+#
+#  https://docs.python.org/3/library/stat.html
 # ----------------------------------------------------------------------------------------
 def walk_tree( base_dir, dict_name ) :
 	reflength = str(len(base_dir) + 1)
@@ -92,6 +94,7 @@ def walk_tree( base_dir, dict_name ) :
 		for name in files:
 			filepath = os.path.join(root, name)
 			size = os.stat(filepath).st_size
+			mtime = os.stat(filepath).st_mtime
 			md5 = compute_md5(filepath)
 
 			if len(root) - len(base_dir) > 0 :
@@ -100,7 +103,7 @@ def walk_tree( base_dir, dict_name ) :
 				short_fp = name
 
 ###			print( "DEBUG: {} {} {}".format( short_fp, md5, size ) )
-			add_member( dict_name, short_fp, "{} {}".format( md5, size ), )
+			add_member( dict_name, short_fp, "{} {} {}".format( md5, size, mtime ), )
 
 
 # ----------------------------------------------------------------------------------------
@@ -117,6 +120,7 @@ def dump_tree( dict_name ) :
 #   https://docs.python.org/2/howto/argparse.html
 #   http://zetcode.com/python/argparse/
 #
+# Maybe DOS vs BASH...?
 #
 # ----------------------------------------------------------------------------------------
 # refdir
@@ -146,139 +150,34 @@ args = parser.parse_args()
 
 ## use_html = args.html
 
-print( "\n\n\n\n\n" )
-
+print( "INFO: Checking direcotry {}".format( args.refdir) )
 walk_tree( args.refdir, reference )
 
-print( "Found {} files in directory {}.".format( len(reference), args.refdir ) )
+print( "Found {} files in directory {}".format( len(reference), args.refdir ) )
 
 dump_tree( reference )
 
 print( "\n\n\n\n\n" )
 
+print( "INFO: Checking direcotry {}".format( args.newdir) )
 walk_tree( args.newdir, new )
 
-print( "Found {} files in directory {}.".format( len(new), args.newdir ) )
+print( "Found {} files in directory {}".format( len(new), args.newdir ) )
 
 dump_tree( new )
 
 print( "\n\n\n\n\n" )
 
+print( "INFO: Checking direcotry {}".format( args.install) )
 walk_tree( args.install, installed )
 
+print( "\n\n\n\n\n" )
 
-print( "Found {} files in directory {}.".format( len(reference), args.refdir ) )
-print( "Found {} files in directory {}.".format( len(new), args.newdir ) )
-print( "Found {} files in directory {}.".format( len(installed), args.install ) )
-
-exit()
-exit()
-exit()
-exit()
-exit()
-exit()
-exit()
-
-
-reflength = str(len(args.refdir) + 1)
-
-for root, dirs, files in os.walk(args.refdir, topdown=False):
-	print( "# dir {}".format( root ) )
-	for name in files:
-		filepath = os.path.join(root, name)
-#		size = filepath.stat().st_size
-		size = os.stat(filepath).st_size
-		md5 = compute_md5(filepath)
-#		print( "DEBUG: {} {} {}".format( filepath, md5, size ) )
-# @@@
-		if len(root) - len(args.refdir) > 0 :
-			short_fp = os.path.join( re.sub("^.{" + reflength + "}", "", root), name )
-		else :
-			short_fp = name
-
-#		print( "DEBUG: root = {}   name = {}   short_fp = {}".format( re.sub("^.{" + reflength + "}", "", root), name, short_fp ) )
-
-		print( "{} {} {}".format( short_fp, md5, size ) )
-		list.append( "{} {} {}".format( short_fp, md5, size ) )
-# @@@		reference[ short_fp ] = "{} {}".format( md5, size )
-		add_member( reference, short_fp, "{} {}".format( md5, size ), )
-#		print( "{} | {} | {}".format( filepath, compute_md5(filepath), size ) )
-
-#		print( compute_md5( os.path.join(root, name)) )
-
-	print( "Found {} files.".format( len(list) ) )
-
-	print( reference )
+print( "Found {} files in directory {}".format( len(reference), args.refdir ) )
+print( "Found {} files in directory {}".format( len(new), args.newdir ) )
+print( "Found {} files in directory {}".format( len(installed), args.install ) )
 
 exit()
 
 
 
-import os
-
-for root, dirs, files in os.walk(".", topdown=False):
-	for name in files:
-		print( "file: {}".format( os.path.join(root, name)) )
-
-	for name in dirs:
-#      print(os.path.join(root, name))
-		print( "dir: {}".format( os.path.join(root, name)) )
-
-
-	exit()
-
-#   cd ~/webcamwatcher/
-#   grep '/home/' *
-#   grep -n '/home/' *
-#   grep -l '/home/' *
-#   grep -l '/home/pi/' *
-#   grep -l '/home/pi/' * | xargs ls -altr
-#   ttttt
-#   wxstatus
-#   cd
-#   cd webcamwatcher/
-#   ls *sh
-#   ls -altr *sh
-#   cd
-#   ls -altr *sh
-#   vi UPDATER.sh 
-#   find . -name '*sh' -ls
-#   vi ./interface_mods/scanner.sh
-#   ls -altr
-#   vi 3096_changes.txt 
-#   vi CumulusMXDist3095_diffs.txt
-#   diff -rq  CumulusMXDist3096 CumulusMX
-#   ls -al tr */Updates*
-#   ls -al tr */Updates.txt
-#   cksum */Updates.txt
-#   cp -p CumulusMXDist3096/Updates.txt CumulusMX
-#   cksum */Updates.txt
-#   diff -rq  CumulusMXDist3096 CumulusMX
-#   diff -rq  CumulusMXDist3096 CumulusMX | sed 's/:*//'
-#   diff -rq  CumulusMXDist3096 CumulusMX | sed 's/:.*//' | sort | uniq
-#   diff -rq  CumulusMXDist3096 CumulusMX | grep CumulusMXDist3096
-#   less CumulusMXDist3096/Updates_RAD.txt
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /'
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | grep 3096
-#   ls -altr webcamwatcher/*.py
-#   ls ~/webcamwatcher/walker.py
-#   cd CumulusMXDist3097
-#   ~/webcamwatcher/walker.py
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | grep 3096
-#   diff -rq ~/CumulusMXDist3097 ~/CumulusMXDist3096 | sed 's/Files /Files   /' | sort | grep 3096
-#   cd
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | grep 3096
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | cut -c 8-
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | cut -c 9-
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | cut -c 9- | sed 's/ and .* differ/ differ/'
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | cut -c 9- | sed 's/ and .* differ//'
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | cut -c 9- | sed 's/ and .* differ//' | xargs -i dirname {}
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | cut -c 9- | sed 's/ and .* differ//' | xargs -i dirname {} | sort
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | cut -c 9- | sed 's/ and .* differ//' | xargs -i dirname {} | sort | uniq
-#   ls -altr
-#   diff -rq CumulusMXDist3097 CumulusMXDist3096 | sed 's/Files /Files   /' | sort | cut -c 9- | sed 's/ and .* differ//' | xargs -i dirname {} | sort | uniq
-#   cd webcamwatcher/
-#   ls -latr | tail
-#   history | tail -n 55 >> walker.py 
