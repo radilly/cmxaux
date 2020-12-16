@@ -1,5 +1,9 @@
 #!/usr/bin/python3
-
+#
+# Example usage:
+#      ~/cmxaux/walker.py ~/CumulusMXDist3096 ~/CumulusMXDist3097 ~/CumulusMX
+#
+#
 # NOTE:
 # NOTE: See if this might be useful to others...
 # NOTE: https://cumulus.hosiene.co.uk/ucp.php?i=pm&mode=view&p=26041
@@ -9,6 +13,9 @@
 #       Could we use patching to copy local updates to an install image??
 #
 # https://www.tutorialspoint.com/python/os_walk.htm
+# ----------------------------------------------------------------------------------------
+#
+#
 # ----------------------------------------------------------------------------------------
 import os
 import hashlib
@@ -37,6 +44,20 @@ import re
 
 list = []
 
+reference = {}
+new = {}
+installed = {}
+
+
+# ----------------------------------------------------------------------------------------
+#
+# https://www.geeksforgeeks.org/python-check-whether-given-key-already-exists-in-a-dictionary/
+#
+#
+#
+#
+#
+# ----------------------------------------------------------------------------------------
 
 def compute_md5( file_name ):
 
@@ -54,31 +75,109 @@ def compute_md5( file_name ):
 
 # ----------------------------------------------------------------------------------------
 #
+# ----------------------------------------------------------------------------------------
+def add_member( dict_name, key_str, value_str ) :
+
+	dict_name[ key_str ] = value_str
+
+
+# ----------------------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------------------
+def walk_tree( base_dir, dict_name ) :
+	reflength = str(len(base_dir) + 1)
+
+	for root, dirs, files in os.walk(base_dir, topdown=False):
+###		print( "DEBUG: dir {}".format( root ) )
+		for name in files:
+			filepath = os.path.join(root, name)
+			size = os.stat(filepath).st_size
+			md5 = compute_md5(filepath)
+
+			if len(root) - len(base_dir) > 0 :
+				short_fp = os.path.join( re.sub("^.{" + reflength + "}", "", root), name )
+			else :
+				short_fp = name
+
+###			print( "DEBUG: {} {} {}".format( short_fp, md5, size ) )
+			add_member( dict_name, short_fp, "{} {}".format( md5, size ), )
+
+
+# ----------------------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------------------
+def dump_tree( dict_name ) :
+	for key in dict_name.keys() :
+		print( "key = \"{}\"  value = \"{}\"".format( key, dict_name[key]) )
+
+
+# ----------------------------------------------------------------------------------------
+#
 # Option to output HTML???
 #   https://docs.python.org/2/howto/argparse.html
 #   http://zetcode.com/python/argparse/
 #
 #
 # ----------------------------------------------------------------------------------------
-
-# ----------------------------------------------------------------------------------------
-#   https://docs.python.org/2/howto/argparse.html
+# refdir
+# - Every file in here should be in 'install'. It may be modified.
+#
+# newdir
+# - Files in here, but not in 'refdir' (or 'install') need to be copied in; new files.
+#      It is possible but unlikely, but if in 'install' diffs need to be examined.
+# - Any file in 'refdir' but not here were removed, and can be deleted from 'install'.
+#
+# install
+# - Any files not in 'refdir' are generated or local additions, and should not touched.
+# - Files here which were modified from refdir need to be protected.
+#      These probably need to examimed manually.
+#
 # ----------------------------------------------------------------------------------------
 parser = argparse.ArgumentParser()
-#>>>>> parser.add_argument("infile", help="Contains a list of log file to check, and optionally a time threshhold")
-parser.add_argument("refdir", help="Path to the directory we will use as the reference.")
-parser.add_argument("chkdir", help="Path to the directory we will compare to the reference.")
-parser.add_argument("--html", help="Output in HTML", action="store_true")
+parser.add_argument("refdir", help="Path to the directory we will use as the reference version.")
+parser.add_argument("newdir", help="Path to the directory with the new version.")
+parser.add_argument("install", help="Path to the installed directory to be updated.")
+## parser.add_argument("--html", help="Output in HTML", action="store_true")
 args = parser.parse_args()
-#	print args.infile
 #	if args.html:
 #		print "html turned on"
-if not args.html:
-	print( "\n\n\n\n\n" )
+## if not args.html:
+##	print( "\n\n\n\n\n" )
 
-use_html = args.html
+## use_html = args.html
 
-#>>>>> infile = args.infile
+print( "\n\n\n\n\n" )
+
+walk_tree( args.refdir, reference )
+
+print( "Found {} files in directory {}.".format( len(reference), args.refdir ) )
+
+dump_tree( reference )
+
+print( "\n\n\n\n\n" )
+
+walk_tree( args.newdir, new )
+
+print( "Found {} files in directory {}.".format( len(new), args.newdir ) )
+
+dump_tree( new )
+
+print( "\n\n\n\n\n" )
+
+walk_tree( args.install, installed )
+
+
+print( "Found {} files in directory {}.".format( len(reference), args.refdir ) )
+print( "Found {} files in directory {}.".format( len(new), args.newdir ) )
+print( "Found {} files in directory {}.".format( len(installed), args.install ) )
+
+exit()
+exit()
+exit()
+exit()
+exit()
+exit()
+exit()
 
 
 reflength = str(len(args.refdir) + 1)
@@ -97,17 +196,19 @@ for root, dirs, files in os.walk(args.refdir, topdown=False):
 		else :
 			short_fp = name
 
-#		print( " root = {}  name = {}".format( re.sub("^.\{{}\}".format( len(root)), "", root), name ) )
-#		print( " root = {}  name = {}".format( re.sub("^.{" + str(len(args.refdir)) + "}", "", root), name ) )
-		print( "DEBUG: root = {}   name = {}   short_fp = {}".format( re.sub("^.{" + reflength + "}", "", root), name, short_fp ) )
+#		print( "DEBUG: root = {}   name = {}   short_fp = {}".format( re.sub("^.{" + reflength + "}", "", root), name, short_fp ) )
 
 		print( "{} {} {}".format( short_fp, md5, size ) )
 		list.append( "{} {} {}".format( short_fp, md5, size ) )
+# @@@		reference[ short_fp ] = "{} {}".format( md5, size )
+		add_member( reference, short_fp, "{} {}".format( md5, size ), )
 #		print( "{} | {} | {}".format( filepath, compute_md5(filepath), size ) )
 
 #		print( compute_md5( os.path.join(root, name)) )
 
 	print( "Found {} files.".format( len(list) ) )
+
+	print( reference )
 
 exit()
 
