@@ -3,6 +3,25 @@
 # Example usage:
 #      ~/cmxaux/walker.py ~/CumulusMXDist3096 ~/CumulusMXDist3097 ~/CumulusMX
 #
+# This script attempts to support an update from one version of Cumulus MX to a newer one.
+# There are 3 directories involved in the process.
+#
+# There is a reference directory (refdir) which is the build as-shipped that is currently
+# installed.  The installed directory (install) includes generated files specific to the
+# installation, produced as CMX is running.  These will not have been in the distribution.
+# However, everthing in reference directory should also be found in the installation.
+# It is possible some of the shipped files were modified in the installed directory.
+#
+# The remaining directory is the new build as-shipped (newdir), presummably one wishes to
+# update the installation to.  The differences between the reference and new builds
+# informs how the installation needs to be altered.
+#
+# refdir - Path to the directory we will use as the reference version; the installed version.
+# newdir - Path to the directory with the new version.
+# install - Path to the installed directory which is to be updated.
+#
+# ----------------------------------------------------------------------------------------
+#
 #
 # NOTE:
 # NOTE: See if this might be useful to others...
@@ -14,7 +33,7 @@
 #
 # https://www.tutorialspoint.com/python/os_walk.htm
 # ----------------------------------------------------------------------------------------
-#
+# 20201218 RAD Reasonably working first cut.
 #
 # ----------------------------------------------------------------------------------------
 import os
@@ -34,8 +53,6 @@ import re
 #      md5_returned = hashlib.md5(data).hexdigest()
 #  TypeError: Unicode-objects must be encoded before hashing
 
-
-
 # https://stackoverflow.com/questions/19699367/for-line-in-results-in-unicodedecodeerror-utf-8-codec-cant-decode-byte
 #    File "/usr/lib/python3.7/codecs.py", line 322, in decode
 #      (result, consumed) = self._buffer_decode(data, self.errors, final)
@@ -51,19 +68,15 @@ installed = {}
 
 # ----------------------------------------------------------------------------------------
 #
+# Get the MD5 checksum for a file.
+#
 # https://www.geeksforgeeks.org/python-check-whether-given-key-already-exists-in-a-dictionary/
 #
-#
-#
-#
-#
 # ----------------------------------------------------------------------------------------
-
-def compute_md5( file_name ):
+def compute_md5( file_name ) :
 
 	# Open,close, read file and calculate MD5 on its contents 
-#	with open(file_name,"r",encoding='utf-8') as file_to_check:
-	with open(file_name,"r",encoding='ISO-8859-1') as file_to_check:
+	with open(file_name,"r",encoding='ISO-8859-1') as file_to_check :
 		# read contents of the file
 #		data = file_to_check.read().encode('utf-8')
 		data = file_to_check.read().encode('ISO-8859-1')
@@ -74,7 +87,9 @@ def compute_md5( file_name ):
 
 
 # ----------------------------------------------------------------------------------------
+# Add a member to the dictionary.
 #
+# This could check that an existing member isn't replaced.
 # ----------------------------------------------------------------------------------------
 def add_member( dict_name, key_str, value_str ) :
 
@@ -103,10 +118,16 @@ def walk_tree( base_dir, dict_name ) :
 				short_fp = name
 
 ###			print( "DEBUG: {} {} {}".format( short_fp, md5, size ) )
-			add_member( dict_name, short_fp, "{} {} {}".format( md5, size, mtime ), )
+			add_member( dict_name, short_fp, "{} {}".format( md5, size ), )
+			# NOTE:
+			# It is possible for mtime to change but the file to be the same.
+			# add_member( dict_name, short_fp, "{} {} {}".format( md5, size, mtime ), )
 
 
 # ----------------------------------------------------------------------------------------
+#
+# Print out a tree and checksums for a dictional we created for a directory.
+#   Used in debugging and testing.
 #
 # ----------------------------------------------------------------------------------------
 def dump_tree( dict_name ) :
@@ -116,11 +137,7 @@ def dump_tree( dict_name ) :
 
 # ----------------------------------------------------------------------------------------
 #
-# Option to output HTML???
-#   https://docs.python.org/2/howto/argparse.html
-#   http://zetcode.com/python/argparse/
-#
-# Maybe DOS vs BASH...?
+# Consider an optn to output DOS or BASH...?
 #
 # ----------------------------------------------------------------------------------------
 # refdir
@@ -138,9 +155,9 @@ def dump_tree( dict_name ) :
 #
 # ----------------------------------------------------------------------------------------
 parser = argparse.ArgumentParser()
-parser.add_argument("refdir", help="Path to the directory we will use as the reference version.")
+parser.add_argument("refdir", help="Path to the directory we will use as the reference version; the installed version.")
 parser.add_argument("newdir", help="Path to the directory with the new version.")
-parser.add_argument("install", help="Path to the installed directory to be updated.")
+parser.add_argument("install", help="Path to the installed directory which is to be updated.")
 ## parser.add_argument("--html", help="Output in HTML", action="store_true")
 args = parser.parse_args()
 #	if args.html:
@@ -150,32 +167,152 @@ args = parser.parse_args()
 
 ## use_html = args.html
 
-print( "INFO: Checking direcotry {}".format( args.refdir) )
+print( "INFO: Checking refdir  directory {}".format( args.refdir) )
 walk_tree( args.refdir, reference )
 
-print( "Found {} files in directory {}".format( len(reference), args.refdir ) )
+# print( "Found {} files in directory {}".format( len(reference), args.refdir ) )
+### dump_tree( reference )
+# DEBUG: print( "\n\n\n" )
 
-dump_tree( reference )
-
-print( "\n\n\n\n\n" )
-
-print( "INFO: Checking direcotry {}".format( args.newdir) )
+print( "INFO: Checking newdir  directory {}".format( args.newdir) )
 walk_tree( args.newdir, new )
 
-print( "Found {} files in directory {}".format( len(new), args.newdir ) )
+# print( "Found {} files in directory {}".format( len(new), args.newdir ) )
+### dump_tree( new )
+# DEBUG: print( "\n\n\n" )
 
-dump_tree( new )
-
-print( "\n\n\n\n\n" )
-
-print( "INFO: Checking direcotry {}".format( args.install) )
+print( "INFO: Checking install directory {}".format( args.install) )
 walk_tree( args.install, installed )
 
-print( "\n\n\n\n\n" )
+print( "\n" )
 
 print( "Found {} files in directory {}".format( len(reference), args.refdir ) )
 print( "Found {} files in directory {}".format( len(new), args.newdir ) )
 print( "Found {} files in directory {}".format( len(installed), args.install ) )
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Compare these lists to determine what actions are required.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+local_mod = []
+missing = []
+same = []
+changed = []
+added = []
+deleted = []
+
+
+print( "\n" )
+print( "INFO: Analysis:\n" )
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# See if anything was modified from the files in the 'reference" directory in the
+#   'installed' copy.
+#
+# These probably have to be looked at by hand... and should not be overlayedi blindly.
+#   There is a patching facility in Linux, but I've never used it.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+for key in reference.keys() :
+	if key in installed.keys() :
+		if installed[key] != reference[key] :
+			local_mod.append( key )
+	else :
+		missing.append( key )
+
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Compare files in the 'newdir' with those in 'refdir' which are either:
+#    identical
+#    changed
+#    added
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+for key in new.keys() :
+	if key in reference.keys() :
+		if new[key] == reference[key] :
+			same.append( key )
+		else :
+			changed.append( key )
+	else :
+		added.append( key )
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Compare files in the 'refdir' with those in 'newdir'.  If not found in 'newdir'
+# it was deleted in in the 'newdir' buid.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+for key in reference.keys() :
+	if not key in new.keys() :
+		deleted.append( key )
+#		print( "DEBUG: Deleted file {}".format( key ) )
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Summarize the analysis
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+print( "INFO: Files in directory {} = {}".format( args.newdir, len(new) ) )
+print( "INFO: Files same between refdir and newdir = {}".format( len(same) ) )
+print( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
+print( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
+print( "DEBUG: Check: {} - {} - {} - {} = {}\n\n".format( len(new), len(same), len(changed), len(added), len(new) - len(same) - len(changed) - len(added) ) )
+# print( "DEBUG: check = {}".format( len(new) - len(same) - len(changed) - len(added) ) )
+
+
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Summarize the analysis
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+print( "INFO: Files missing from install relative to refdir = {}".format( len(missing) ) )
+print( "INFO: These will have to be investigated.  This is unusual and potentially problematic." )
+for filename in missing :
+	print( "          {}".format( filename ) )
+
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Print the lists we compiled above.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+print( "\n" )
+print( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
+print( "INFO: These will have to be inspected / compared." )
+for filename in local_mod :
+	print( "          {}".format( filename ) )
+	print( "          *  {}".format( os.path.join( args.refdir, filename ) ) )
+	print( "          *  {}\n".format( os.path.join( args.install, filename ) ) )
+
+
+
+print( "\n" )
+print( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
+print( "INFO: These *potentially* might be replaced in install. Check for WARNINGs." )
+for filename in changed :
+	print( "          {}".format( filename ) )
+	if filename in local_mod :
+		print( "WARNING:          {} was modified in install".format( filename ) )
+
+
+print( "\n" )
+print( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
+print( "INFO: These *potentially* may be copied in install, if they don't already exist (unusual)." )
+for filename in added :
+	print( "          {}".format( filename ) )
+	if filename in installed.keys() :
+		print( "WARNING:          {} already exists in install".format( filename ) )
+		if filename in local_mod :
+			print( "WARNING:          {} was also modified in install".format( filename ) )
+
+
+print( "\n" )
+print( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
+print( "INFO: These *potentially* may be deleted from install.  Verify that are not referenced by anything." )
+for filename in deleted :
+	print( "          {}".format( filename ) )
+
+
+print( "" )
+
+
 
 exit()
 
