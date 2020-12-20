@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# @@@
 #
 # Example usage:
 #      ~/cmxaux/walker.py ~/CumulusMXDist3096 ~/CumulusMXDist3097 ~/CumulusMX
@@ -31,8 +32,11 @@
 # NOTE: https://opensource.com/article/18/8/diffs-patches
 #       Could we use patching to copy local updates to an install image??
 #
-# https://www.tutorialspoint.com/python/os_walk.htm
 # ----------------------------------------------------------------------------------------
+# 20201219 Reorganize walk_tree() to make it a little more efficient by pulling things
+#          out of loops where possible.  Added use_merged to walk_tree() to reduce the
+#          the run time of this script, especially where there's a lot of historical
+#          data.
 # 20201218 RAD Reasonably working first cut.
 #
 # ----------------------------------------------------------------------------------------
@@ -60,11 +64,13 @@ import re
 # ----------------------------------------------------------------------------------------
 
 list = []
+merged = []
 
 reference = {}
 new = {}
 installed = {}
 
+script_out = False
 
 # ----------------------------------------------------------------------------------------
 #
@@ -91,37 +97,58 @@ def compute_md5( file_name ) :
 #
 # This could check that an existing member isn't replaced.
 # ----------------------------------------------------------------------------------------
+def add_to_list( list_name, value_str ) :
+
+	if not value_str in list_name :
+		list_name.append( value_str )
+
+
+
+# ----------------------------------------------------------------------------------------
+# Add a member to the dictionary.
+#
+# This could check that an existing member isn't replaced.
+# ----------------------------------------------------------------------------------------
 def add_member( dict_name, key_str, value_str ) :
 
 	dict_name[ key_str ] = value_str
 
 
 # ----------------------------------------------------------------------------------------
+# Walk the directory tree to get all the file names.
+# The "top" directory is trimed off each file so we can compare different trees.
 #
+# use_merged is used to avoid getting an MD5 where its not needed. It is fairly
+# expensive, and many of the installed files are unique, and generated at runtime.
 #
 #  https://docs.python.org/3/library/stat.html
+#  https://www.tutorialspoint.com/python/os_walk.htm
 # ----------------------------------------------------------------------------------------
-def walk_tree( base_dir, dict_name ) :
-	reflength = str(len(base_dir) + 1)
+def walk_tree( base_dir, dict_name, use_merged ) :
+
+	reflength = str(len(base_dir))   # Used by re.sub to trim base_dir off
 
 	for root, dirs, files in os.walk(base_dir, topdown=False):
-###		print( "DEBUG: dir {}".format( root ) )
+		short_root = re.sub("^.{" + reflength + "}[\/]*", "", root)
 		for name in files:
-			filepath = os.path.join(root, name)
-			size = os.stat(filepath).st_size
-			mtime = os.stat(filepath).st_mtime
-			md5 = compute_md5(filepath)
+			short_fp = os.path.join(short_root, name)
 
-			if len(root) - len(base_dir) > 0 :
-				short_fp = os.path.join( re.sub("^.{" + reflength + "}", "", root), name )
+			if use_merged  and  not short_fp in merged :
+				value = ""
 			else :
-				short_fp = name
+				add_to_list( merged, short_fp )
+				filepath = os.path.join(root, name)
+				size = os.stat(filepath).st_size
+#				mtime = os.stat(filepath).st_mtime
+				md5 = compute_md5(filepath)
+				value = "{} {}".format( md5, size )
 
-###			print( "DEBUG: {} {} {}".format( short_fp, md5, size ) )
-			add_member( dict_name, short_fp, "{} {}".format( md5, size ), )
+			add_member( dict_name, short_fp, value )
 			# NOTE:
 			# It is possible for mtime to change but the file to be the same.
 			# add_member( dict_name, short_fp, "{} {} {}".format( md5, size, mtime ), )
+
+#	print( "DEBUG: len(merged) = {}  use_merged = {}".format( len(merged), use_merged ) )
 
 
 # ----------------------------------------------------------------------------------------
@@ -158,6 +185,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("refdir", help="Path to the directory we will use as the reference version; the installed version.")
 parser.add_argument("newdir", help="Path to the directory with the new version.")
 parser.add_argument("install", help="Path to the installed directory which is to be updated.")
+script_out = False   # PARAMETERIZE
+script_out = False   # PARAMETERIZE
+script_out = False   # PARAMETERIZE
 ## parser.add_argument("--html", help="Output in HTML", action="store_true")
 args = parser.parse_args()
 #	if args.html:
@@ -168,27 +198,29 @@ args = parser.parse_args()
 ## use_html = args.html
 
 print( "INFO: Checking refdir  directory {}".format( args.refdir) )
-walk_tree( args.refdir, reference )
+walk_tree( args.refdir, reference, False )
 
 # print( "Found {} files in directory {}".format( len(reference), args.refdir ) )
 ### dump_tree( reference )
 # DEBUG: print( "\n\n\n" )
 
 print( "INFO: Checking newdir  directory {}".format( args.newdir) )
-walk_tree( args.newdir, new )
+walk_tree( args.newdir, new, False )
 
 # print( "Found {} files in directory {}".format( len(new), args.newdir ) )
 ### dump_tree( new )
 # DEBUG: print( "\n\n\n" )
 
 print( "INFO: Checking install directory {}".format( args.install) )
-walk_tree( args.install, installed )
+walk_tree( args.install, installed, True )
 
 print( "\n" )
 
-print( "Found {} files in directory {}".format( len(reference), args.refdir ) )
-print( "Found {} files in directory {}".format( len(new), args.newdir ) )
-print( "Found {} files in directory {}".format( len(installed), args.install ) )
+print( "INFO: Summary:" )
+print( "INFO: Found {} files in directory {}".format( len(reference), args.refdir ) )
+print( "INFO: Found {} files in directory {}".format( len(new), args.newdir ) )
+print( "INFO: Found {} files in directory {}".format( len(installed), args.install ) )
+print( "INFO: Accumulated MD5 checksums for {} files".format( len(merged) ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -221,7 +253,6 @@ for key in reference.keys() :
 		missing.append( key )
 
 
-
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Compare files in the 'newdir' with those in 'refdir' which are either:
 #    identical
@@ -247,6 +278,7 @@ for key in reference.keys() :
 		deleted.append( key )
 #		print( "DEBUG: Deleted file {}".format( key ) )
 
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Summarize the analysis
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -258,8 +290,6 @@ print( "DEBUG: Check: {} - {} - {} - {} = {}\n\n".format( len(new), len(same), l
 # print( "DEBUG: check = {}".format( len(new) - len(same) - len(changed) - len(added) ) )
 
 
-
-
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Summarize the analysis
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -267,7 +297,6 @@ print( "INFO: Files missing from install relative to refdir = {}".format( len(mi
 print( "INFO: These will have to be investigated.  This is unusual and potentially problematic." )
 for filename in missing :
 	print( "          {}".format( filename ) )
-
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -282,7 +311,6 @@ for filename in local_mod :
 	print( "          *  {}\n".format( os.path.join( args.install, filename ) ) )
 
 
-
 print( "\n" )
 print( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
 print( "INFO: These *potentially* might be replaced in install. Check for WARNINGs." )
@@ -290,6 +318,9 @@ for filename in changed :
 	print( "          {}".format( filename ) )
 	if filename in local_mod :
 		print( "WARNING:          {} was modified in install".format( filename ) )
+	else :
+		if script_out :
+			print( "# cp -p {} {}".format( os.path.join( args.newdir, filename ), os.path.join( args.install, filename ) ) )
 
 
 print( "\n" )
@@ -301,18 +332,31 @@ for filename in added :
 		print( "WARNING:          {} already exists in install".format( filename ) )
 		if filename in local_mod :
 			print( "WARNING:          {} was also modified in install".format( filename ) )
+	else :
+		if script_out :
+			print( "# cp -p {} {}".format( os.path.join( args.newdir, filename ), os.path.join( args.install, filename ) ) )
+
 
 
 print( "\n" )
 print( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
-print( "INFO: These *potentially* may be deleted from install.  Verify that are not referenced by anything." )
+print( "INFO: These *potentially* may be deleted from install.  Verify that they are not referenced by anything." )
 for filename in deleted :
 	print( "          {}".format( filename ) )
+	if filename in installed.keys() :
+		if script_out :
+			print( "# rm {}".format( os.path.join( args.install, filename ) ) )
+	else :
+		print( "WARNING:          {} does NOT exist in install".format( filename ) )
 
 
 print( "" )
 
-
+print( "INFO: Summary:" )
+print( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
+print( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
+print( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
+print( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
 
 exit()
 
