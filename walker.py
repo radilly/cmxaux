@@ -62,6 +62,23 @@ import re
 #      (result, consumed) = self._buffer_decode(data, self.errors, final)
 #  UnicodeDecodeError: 'utf-8' codec can't decode byte 0x94 in position 3: invalid start byte
 # ----------------------------------------------------------------------------------------
+copy = {
+	'dos': 'COPY',
+	'bash': 'cp -p'
+}
+
+remove = {
+	'dos': 'DEL',
+	'bash': 'rm'
+}
+
+comment = {
+	'dos': 'REM  ',
+	'bash': '#  '
+}
+
+prt_prefix = ""
+script_type = "none"
 
 list = []
 merged = []
@@ -129,7 +146,7 @@ def walk_tree( base_dir, dict_name, use_merged ) :
 	reflength = str(len(base_dir))   # Used by re.sub to trim base_dir off
 
 	for root, dirs, files in os.walk(base_dir, topdown=False):
-		short_root = re.sub("^.{" + reflength + "}[\/]*", "", root)
+		short_root = re.sub("^.{" + reflength + "}[\\\/]*", "", root)
 		for name in files:
 			short_fp = os.path.join(short_root, name)
 
@@ -145,7 +162,8 @@ def walk_tree( base_dir, dict_name, use_merged ) :
 
 			add_member( dict_name, short_fp, value )
 			# NOTE:
-			# It is possible for mtime to change but the file to be the same.
+			# It is possible for mtime to change but the file to be the same
+			# so I removed is the the dictionary vaue.  It was ...
 			# add_member( dict_name, short_fp, "{} {} {}".format( md5, size, mtime ), )
 
 #	print( "DEBUG: len(merged) = {}  use_merged = {}".format( len(merged), use_merged ) )
@@ -161,6 +179,20 @@ def dump_tree( dict_name ) :
 	for key in dict_name.keys() :
 		print( "key = \"{}\"  value = \"{}\"".format( key, dict_name[key]) )
 
+
+# ----------------------------------------------------------------------------------------
+#
+# Print with a prefir if we're scripting...
+#
+# ----------------------------------------------------------------------------------------
+def prt( text ) :
+
+	print( "{}{}".format( prt_prefix, text ) )
+
+	return
+
+	if script_type == "none" :
+		print( "{}{}".format( prt_prefix, text ) )
 
 # ----------------------------------------------------------------------------------------
 #
@@ -180,22 +212,32 @@ def dump_tree( dict_name ) :
 # - Files here which were modified from refdir need to be protected.
 #      These probably need to examimed manually.
 #
+# https://docs.python.org/3/library/argparse.html
 # ----------------------------------------------------------------------------------------
-parser = argparse.ArgumentParser()
-parser.add_argument("refdir", help="Path to the directory we will use as the reference version; the installed version.")
+parser = argparse.ArgumentParser(description="This assists in updating an existing Cumulus MX installtion.")
+parser.add_argument("refdir", help="Path to the directory we will use as the reference version; the installed version as-shipped.")
 parser.add_argument("newdir", help="Path to the directory with the new version.")
-parser.add_argument("install", help="Path to the installed directory which is to be updated.")
+parser.add_argument("install", help="Path to the installed directory which is to be updated (from the version in refdir).")
 script_out = False   # PARAMETERIZE
 script_out = False   # PARAMETERIZE
 script_out = False   # PARAMETERIZE
-## parser.add_argument("--html", help="Output in HTML", action="store_true")
+parser.add_argument("--script", help="Generate output in script format.", choices=['dos', 'bash'], default="none")
 args = parser.parse_args()
-#	if args.html:
-#		print "html turned on"
-## if not args.html:
-##	print( "\n\n\n\n\n" )
 
-## use_html = args.html
+print( "INFO: script output is set to \"{}\"".format(args.script) )
+
+script_type = args.script
+if script_type == "none" :
+	print( "INFO: script output is off" )
+else :
+	script_out = True
+	prt_prefix = comment[ script_type ]
+
+
+# If we need the "join" character...
+sep = os.path.join("x", "x")
+sep = re.sub("x", "", sep)
+
 
 print( "INFO: Checking refdir  directory {}".format( args.refdir) )
 walk_tree( args.refdir, reference, False )
@@ -320,7 +362,7 @@ for filename in changed :
 		print( "WARNING:          {} was modified in install".format( filename ) )
 	else :
 		if script_out :
-			print( "# cp -p {} {}".format( os.path.join( args.newdir, filename ), os.path.join( args.install, filename ) ) )
+			print( "# {} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ), os.path.join( args.install, filename ) ) )
 
 
 print( "\n" )
@@ -334,7 +376,7 @@ for filename in added :
 			print( "WARNING:          {} was also modified in install".format( filename ) )
 	else :
 		if script_out :
-			print( "# cp -p {} {}".format( os.path.join( args.newdir, filename ), os.path.join( args.install, filename ) ) )
+			print( "# {} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ), os.path.join( args.install, filename ) ) )
 
 
 
@@ -345,7 +387,7 @@ for filename in deleted :
 	print( "          {}".format( filename ) )
 	if filename in installed.keys() :
 		if script_out :
-			print( "# rm {}".format( os.path.join( args.install, filename ) ) )
+			print( "# {} {}".format( remove[script_type], os.path.join( args.install, filename ) ) )
 	else :
 		print( "WARNING:          {} does NOT exist in install".format( filename ) )
 
@@ -357,6 +399,14 @@ print( "INFO: Files modified in install relative to refdir = {}".format( len(loc
 print( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
 print( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
 print( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
+
+
+print( "\n" )
+if script_type == "none" :
+	prt( "INFO: script output is off" )
+else :
+	prt( "DEBUG: copy command = {}".format( copy[ script_type ] ) )
+	prt( "DEBUG: remove command = {}".format( remove[ script_type ] ) )
 
 exit()
 
