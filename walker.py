@@ -7,6 +7,11 @@
 # This script attempts to support an update from one version of Cumulus MX to a newer one.
 # There are 3 directories involved in the process.
 #
+# A script can be generated using the --script flag which requires a parameter for
+# the target platform: "bash" or "dos".  The script should be inspected, particularly
+# the lines where a WARNING is given.  It STRONGLY recommended that you do not run
+# the script without checking it first.
+#
 # There is a reference directory (refdir) which is the build as-shipped that is currently
 # installed.  The installed directory (install) includes generated files specific to the
 # installation, produced as CMX is running.  These will not have been in the distribution.
@@ -23,7 +28,6 @@
 #
 # ----------------------------------------------------------------------------------------
 #
-#
 # NOTE:
 # NOTE: See if this might be useful to others...
 # NOTE: https://cumulus.hosiene.co.uk/ucp.php?i=pm&mode=view&p=26041
@@ -33,6 +37,9 @@
 #       Could we use patching to copy local updates to an install image??
 #
 # ----------------------------------------------------------------------------------------
+# 20201221 The --script flag was added.  By default this prints a report. The --script
+#          requires an argument, either "bash" or "dos".  This causes the report to
+#          be issued as a set of comments, with appropriate commands interspersed.
 # 20201219 Reorganize walk_tree() to make it a little more efficient by pulling things
 #          out of loops where possible.  Added use_merged to walk_tree() to reduce the
 #          the run time of this script, especially where there's a lot of historical
@@ -49,14 +56,14 @@ import re
 # ----------------------------------------------------------------------------------------
 # https://stackoverflow.com/questions/46605842/executing-bashs-complex-find-command-in-python-shell
 # os.walk()
-
+#
 # https://stackoverflow.com/questions/16874598/how-do-i-calculate-the-md5-checksum-of-a-file-in-python
-
+#
 # https://stackoverflow.com/questions/7585307/how-to-correct-typeerror-unicode-objects-must-be-encoded-before-hashing
 #    File "./walker.py", line 14, in compute_md5
 #      md5_returned = hashlib.md5(data).hexdigest()
 #  TypeError: Unicode-objects must be encoded before hashing
-
+#
 # https://stackoverflow.com/questions/19699367/for-line-in-results-in-unicodedecodeerror-utf-8-codec-cant-decode-byte
 #    File "/usr/lib/python3.7/codecs.py", line 322, in decode
 #      (result, consumed) = self._buffer_decode(data, self.errors, final)
@@ -73,8 +80,8 @@ remove = {
 }
 
 comment = {
-	'dos': 'REM  ',
-	'bash': '#  '
+	'dos': '  REM - ',
+	'bash': '  #  '
 }
 
 prt_prefix = ""
@@ -177,7 +184,7 @@ def walk_tree( base_dir, dict_name, use_merged ) :
 # ----------------------------------------------------------------------------------------
 def dump_tree( dict_name ) :
 	for key in dict_name.keys() :
-		print( "key = \"{}\"  value = \"{}\"".format( key, dict_name[key]) )
+		prt( "key = \"{}\"  value = \"{}\"".format( key, dict_name[key]) )
 
 
 # ----------------------------------------------------------------------------------------
@@ -218,51 +225,48 @@ parser = argparse.ArgumentParser(description="This assists in updating an existi
 parser.add_argument("refdir", help="Path to the directory we will use as the reference version; the installed version as-shipped.")
 parser.add_argument("newdir", help="Path to the directory with the new version.")
 parser.add_argument("install", help="Path to the installed directory which is to be updated (from the version in refdir).")
-script_out = False   # PARAMETERIZE
-script_out = False   # PARAMETERIZE
-script_out = False   # PARAMETERIZE
 parser.add_argument("--script", help="Generate output in script format.", choices=['dos', 'bash'], default="none")
 args = parser.parse_args()
 
-print( "INFO: script output is set to \"{}\"".format(args.script) )
 
 script_type = args.script
 if script_type == "none" :
-	print( "INFO: script output is off" )
+	prt( "INFO: script output is off\n" )
 else :
 	script_out = True
 	prt_prefix = comment[ script_type ]
 
+prt( "INFO: script output is set to \"{}\"\n".format(args.script) )
 
 # If we need the "join" character...
 sep = os.path.join("x", "x")
 sep = re.sub("x", "", sep)
 
 
-print( "INFO: Checking refdir  directory {}".format( args.refdir) )
+prt( "INFO: Checking refdir  directory {}".format( args.refdir) )
 walk_tree( args.refdir, reference, False )
 
-# print( "Found {} files in directory {}".format( len(reference), args.refdir ) )
+# prt( "Found {} files in directory {}".format( len(reference), args.refdir ) )
 ### dump_tree( reference )
-# DEBUG: print( "\n\n\n" )
+# DEBUG: prt( "\n\n\n" )
 
-print( "INFO: Checking newdir  directory {}".format( args.newdir) )
+prt( "INFO: Checking newdir  directory {}".format( args.newdir) )
 walk_tree( args.newdir, new, False )
 
-# print( "Found {} files in directory {}".format( len(new), args.newdir ) )
+# prt( "Found {} files in directory {}".format( len(new), args.newdir ) )
 ### dump_tree( new )
-# DEBUG: print( "\n\n\n" )
+# DEBUG: prt( "\n\n\n" )
 
-print( "INFO: Checking install directory {}".format( args.install) )
+prt( "INFO: Checking install directory {}".format( args.install) )
 walk_tree( args.install, installed, True )
 
 print( "\n" )
 
-print( "INFO: Summary:" )
-print( "INFO: Found {} files in directory {}".format( len(reference), args.refdir ) )
-print( "INFO: Found {} files in directory {}".format( len(new), args.newdir ) )
-print( "INFO: Found {} files in directory {}".format( len(installed), args.install ) )
-print( "INFO: Accumulated MD5 checksums for {} files".format( len(merged) ) )
+prt( "INFO: Summary:" )
+prt( "INFO: Found {} files in directory {}".format( len(reference), args.refdir ) )
+prt( "INFO: Found {} files in directory {}".format( len(new), args.newdir ) )
+prt( "INFO: Found {} files in directory {}".format( len(installed), args.install ) )
+prt( "INFO: Accumulated MD5 checksums for {} files".format( len(merged) ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -277,7 +281,7 @@ deleted = []
 
 
 print( "\n" )
-print( "INFO: Analysis:\n" )
+prt( "INFO: Analysis:\n" )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -318,87 +322,90 @@ for key in new.keys() :
 for key in reference.keys() :
 	if not key in new.keys() :
 		deleted.append( key )
-#		print( "DEBUG: Deleted file {}".format( key ) )
+#		prt( "DEBUG: Deleted file {}".format( key ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Summarize the analysis
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-print( "INFO: Files in directory {} = {}".format( args.newdir, len(new) ) )
-print( "INFO: Files same between refdir and newdir = {}".format( len(same) ) )
-print( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
-print( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
-print( "DEBUG: Check: {} - {} - {} - {} = {}\n\n".format( len(new), len(same), len(changed), len(added), len(new) - len(same) - len(changed) - len(added) ) )
-# print( "DEBUG: check = {}".format( len(new) - len(same) - len(changed) - len(added) ) )
+prt( "INFO: Files in directory {} = {}".format( args.newdir, len(new) ) )
+prt( "INFO: Files same between refdir and newdir = {}".format( len(same) ) )
+prt( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
+prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
+prt( "DEBUG: Check: {} - {} - {} - {} = {}\n\n".format( len(new), len(same), len(changed), len(added), len(new) - len(same) - len(changed) - len(added) ) )
+# prt( "DEBUG: check = {}".format( len(new) - len(same) - len(changed) - len(added) ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Summarize the analysis
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-print( "INFO: Files missing from install relative to refdir = {}".format( len(missing) ) )
-print( "INFO: These will have to be investigated.  This is unusual and potentially problematic." )
+prt( "INFO: Files missing from install relative to refdir = {}".format( len(missing) ) )
+prt( "INFO: These will have to be investigated.  This is unusual and potentially problematic." )
 for filename in missing :
-	print( "          {}".format( filename ) )
+	prt( "          {}".format( filename ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Print the lists we compiled above.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
-print( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
-print( "INFO: These will have to be inspected / compared." )
+prt( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
+prt( "INFO: These will have to be inspected / compared." )
 for filename in local_mod :
-	print( "          {}".format( filename ) )
-	print( "          *  {}".format( os.path.join( args.refdir, filename ) ) )
-	print( "          *  {}\n".format( os.path.join( args.install, filename ) ) )
+	prt( "          {}".format( filename ) )
+	prt( "          *  {}".format( os.path.join( args.refdir, filename ) ) )
+	prt( "          *  {}\n".format( os.path.join( args.install, filename ) ) )
 
 
 print( "\n" )
-print( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
-print( "INFO: These *potentially* might be replaced in install. Check for WARNINGs." )
+prt( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
+prt( "INFO: These *potentially* might be replaced in install. Check for WARNINGs." )
 for filename in changed :
-	print( "          {}".format( filename ) )
+	prt( "          {}".format( filename ) )
 	if filename in local_mod :
-		print( "WARNING:          {} was modified in install".format( filename ) )
+		prt( "WARNING:          {} was modified in install\n".format( filename ) )
 	else :
 		if script_out :
-			print( "# {} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ), os.path.join( args.install, filename ) ) )
+			print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
+				os.path.join( args.install, filename ) ) )
 
 
 print( "\n" )
-print( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
-print( "INFO: These *potentially* may be copied in install, if they don't already exist (unusual)." )
+prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
+prt( "INFO: These *potentially* may be copied in install, if they don't already exist (unusual)." )
 for filename in added :
-	print( "          {}".format( filename ) )
+	prt( "          {}".format( filename ) )
 	if filename in installed.keys() :
-		print( "WARNING:          {} already exists in install".format( filename ) )
+		prt( "WARNING:          {} already exists in install".format( filename ) )
 		if filename in local_mod :
-			print( "WARNING:          {} was also modified in install".format( filename ) )
+			prt( "WARNING:          {} was also modified in install".format( filename ) )
+		print( "" )
 	else :
 		if script_out :
-			print( "# {} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ), os.path.join( args.install, filename ) ) )
+			print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
+				os.path.join( args.install, filename ) ) )
 
 
 
 print( "\n" )
-print( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
-print( "INFO: These *potentially* may be deleted from install.  Verify that they are not referenced by anything." )
+prt( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
+prt( "INFO: These *potentially* may be deleted from install.  Verify that they are not referenced by anything." )
 for filename in deleted :
-	print( "          {}".format( filename ) )
+	prt( "          {}".format( filename ) )
 	if filename in installed.keys() :
 		if script_out :
-			print( "# {} {}".format( remove[script_type], os.path.join( args.install, filename ) ) )
+			print( "{} {}".format( remove[script_type], os.path.join( args.install, filename ) ) )
 	else :
-		print( "WARNING:          {} does NOT exist in install".format( filename ) )
+		prt( "WARNING:          {} does NOT exist in install\n".format( filename ) )
 
 
-print( "" )
+print( "\n" )
 
-print( "INFO: Summary:" )
-print( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
-print( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
-print( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
-print( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
+prt( "INFO: Summary:" )
+prt( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
+prt( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
+prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
+prt( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
 
 
 print( "\n" )
