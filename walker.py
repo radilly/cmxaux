@@ -221,7 +221,7 @@ def prt( text ) :
 #
 # https://docs.python.org/3/library/argparse.html
 # ----------------------------------------------------------------------------------------
-parser = argparse.ArgumentParser(description="This assists in updating an existing Cumulus MX installtion.")
+parser = argparse.ArgumentParser(description="This assists in updating an existing Cumulus MX installation.")
 parser.add_argument("refdir", help="Path to the directory we will use as the reference version; the installed version as-shipped.")
 parser.add_argument("newdir", help="Path to the directory with the new version.")
 parser.add_argument("install", help="Path to the installed directory which is to be updated (from the version in refdir).")
