@@ -266,7 +266,7 @@ prt( "INFO: Summary:" )
 prt( "INFO: Found {} files in directory {}".format( len(reference), args.refdir ) )
 prt( "INFO: Found {} files in directory {}".format( len(new), args.newdir ) )
 prt( "INFO: Found {} files in directory {}".format( len(installed), args.install ) )
-prt( "INFO: Accumulated MD5 checksums for {} files".format( len(merged) ) )
+prt( "INFO: Accumulated MD5 checksums for {} files in {}".format( len(merged), args.install ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
