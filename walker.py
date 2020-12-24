@@ -37,6 +37,8 @@
 #       Could we use patching to copy local updates to an install image??
 #
 # ----------------------------------------------------------------------------------------
+# 20201224 Not technically necessary, but typically when copying a file the file name
+#          isn't given on the destination, just the path.
 # 20201221 The --script flag was added.  By default this prints a report. The --script
 #          requires an argument, either "bash" or "dos".  This causes the report to
 #          be issued as a set of comments, with appropriate commands interspersed.
@@ -117,9 +119,9 @@ def compute_md5( file_name ) :
 
 
 # ----------------------------------------------------------------------------------------
-# Add a member to the dictionary.
+# Add a member to a list
+# This checks that an existing member isn't replaced.
 #
-# This could check that an existing member isn't replaced.
 # ----------------------------------------------------------------------------------------
 def add_to_list( list_name, value_str ) :
 
@@ -128,10 +130,23 @@ def add_to_list( list_name, value_str ) :
 
 
 
+
 # ----------------------------------------------------------------------------------------
-# Add a member to the dictionary.
+# Given a file path, i.e. path + file name, it returns just the path.
+#    Assumes you've pass a file path + name, and we use the separator for this OS.
 #
-# This could check that an existing member isn't replaced.
+# ----------------------------------------------------------------------------------------
+def path_only( file_path ) :
+
+        return re.sub("{}[^{}]*$".format( sep, sep ), sep, file_path )
+
+
+
+
+# ----------------------------------------------------------------------------------------
+# Add a member to a dictionary.
+#
+# This *could* check that an existing member isn't replaced.
 # ----------------------------------------------------------------------------------------
 def add_member( dict_name, key_str, value_str ) :
 
@@ -188,18 +203,14 @@ def dump_tree( dict_name ) :
 
 
 # ----------------------------------------------------------------------------------------
-#
 # Print with a prefir if we're scripting...
+#    Turns each line of the default report into a comment in a generated script.
 #
 # ----------------------------------------------------------------------------------------
 def prt( text ) :
 
 	print( "{}{}".format( prt_prefix, text ) )
 
-	return
-
-	if script_type == "none" :
-		print( "{}{}".format( prt_prefix, text ) )
 
 # ----------------------------------------------------------------------------------------
 #
@@ -270,7 +281,7 @@ prt( "INFO: Accumulated MD5 checksums for {} files in {}".format( len(merged), a
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Compare these lists to determine what actions are required.
+# built these lists as we compare directories to determine what actions are required.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 local_mod = []
 missing = []
@@ -367,7 +378,7 @@ for filename in changed :
 	else :
 		if script_out :
 			print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
-				os.path.join( args.install, filename ) ) )
+				path_only( os.path.join( args.install, filename ) ) ) )
 
 
 print( "\n" )
@@ -383,7 +394,7 @@ for filename in added :
 	else :
 		if script_out :
 			print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
-				os.path.join( args.install, filename ) ) )
+				path_only( os.path.join( args.install, filename ) ) ) )
 
 
 
