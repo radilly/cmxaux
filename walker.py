@@ -3,12 +3,17 @@
 #
 # Example usage:
 #      ~/cmxaux/walker.py ~/CumulusMXDist3096 ~/CumulusMXDist3097 ~/CumulusMX
+#                            -refdir-              -newdir-        -install-
+#
+# refdir - Path to the directory we will use as the reference; the last installed version.
+# newdir - Path to the directory with the new version.
+# install - Path to the installed directory which is to be updated.
 #
 # This script attempts to support an update from one version of Cumulus MX to a newer one.
-# There are 3 directories involved in the process.
+# There are 3 directories involved in the process as listed above.
 #
 # A script can be generated using the --script flag which requires a parameter for
-# the target platform: "bash" or "dos".  The script should be inspected, particularly
+# the target platform: "bash" or "dos".  The script SHOULD BE INSPECTED, particularly
 # the lines where a WARNING is given.  It STRONGLY recommended that you do not run
 # the script without checking it first.
 #
@@ -16,15 +21,13 @@
 # installed.  The installed directory (install) includes generated files specific to the
 # installation, produced as CMX is running.  These will not have been in the distribution.
 # However, everthing in reference directory should also be found in the installation.
-# It is possible some of the shipped files were modified in the installed directory.
+# It is possible that some of the shipped files were modified in the installed directory,
+# and we should not overlay any changes.
 #
-# The remaining directory is the new build as-shipped (newdir), presummably one wishes to
+# The remaining directory is the new build, as-shipped (newdir), presummably one wishes to
 # update the installation to.  The differences between the reference and new builds
-# informs how the installation needs to be altered.
-#
-# refdir - Path to the directory we will use as the reference version; the installed version.
-# newdir - Path to the directory with the new version.
-# install - Path to the installed directory which is to be updated.
+# informs how the installation needs to be altered. In other words, and files that same
+# between the 2 as-shiped directories require no action in the installed directory.
 #
 # ----------------------------------------------------------------------------------------
 #
@@ -39,6 +42,7 @@
 # ----------------------------------------------------------------------------------------
 # 20201231 While testing on Windows I had trouble with path_only(), and it suddenly
 #          dawned on me that os.path already has dirname() which handles that.
+# 20201226 Cleaned up the description above.
 # 20201224 Not technically necessary, but typically when copying a file the file name
 #          isn't given on the destination, just the path.
 # 20201221 The --script flag was added.  By default this prints a report. The --script
@@ -72,6 +76,8 @@ import re
 #    File "/usr/lib/python3.7/codecs.py", line 322, in decode
 #      (result, consumed) = self._buffer_decode(data, self.errors, final)
 #  UnicodeDecodeError: 'utf-8' codec can't decode byte 0x94 in position 3: invalid start byte
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#  These dictionaries provide script-type (dos or bash) specifics.
 # ----------------------------------------------------------------------------------------
 copy = {
 	'dos': 'COPY',
@@ -91,12 +97,13 @@ comment = {
 prt_prefix = ""
 script_type = "none"
 
-list = []
 merged = []
 
-reference = {}
-new = {}
-installed = {}
+# These dictionaries will accumulate the MD5 signatures and sizes of files
+# for files in the directoies specified as parameters to this script.
+reference = {}		# refdir
+new = {}		# newdir
+installed = {}		# install
 
 script_out = False
 
@@ -181,7 +188,7 @@ def walk_tree( base_dir, dict_name, use_merged ) :
 
 # ----------------------------------------------------------------------------------------
 #
-# Print out a tree and checksums for a dictional we created for a directory.
+# Print out a tree and checksums for a dictionary we created for a directory.
 #   Used in debugging and testing.
 #
 # ----------------------------------------------------------------------------------------
@@ -238,8 +245,8 @@ else :
 prt( "INFO: script output is set to \"{}\"\n".format(args.script) )
 
 # If we need the "join" character...
-sep = os.path.join("x", "x")
-sep = re.sub("x", "", sep)
+dir_sep = os.path.join("x", "x")
+dir_sep = re.sub("x", "", dir_sep)
 
 
 prt( "INFO: Checking refdir  directory {}".format( args.refdir) )
@@ -269,7 +276,7 @@ prt( "INFO: Accumulated MD5 checksums for {} files in {}".format( len(merged), a
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# built these lists as we compare directories to determine what actions are required.
+#  Build these lists as we compare directories to determine what actions are required.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 local_mod = []
 missing = []
@@ -284,10 +291,10 @@ prt( "INFO: Analysis:\n" )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# See if anything was modified from the files in the 'reference" directory in the
+#  See if anything was modified from the files in the 'reference" directory in the
 #   'installed' copy.
 #
-# These probably have to be looked at by hand... and should not be overlayedi blindly.
+#  These probably have to be looked at by hand... and should not be overlayedi blindly.
 #   There is a patching facility in Linux, but I've never used it.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 for key in reference.keys() :
@@ -299,7 +306,7 @@ for key in reference.keys() :
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Compare files in the 'newdir' with those in 'refdir' which are either:
+#  Compare files in the 'newdir' with those in 'refdir' which are either:
 #    identical
 #    changed
 #    added
@@ -315,8 +322,8 @@ for key in new.keys() :
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Compare files in the 'refdir' with those in 'newdir'.  If not found in 'newdir'
-# it was deleted in in the 'newdir' buid.
+#  Compare files in the 'refdir' with those in 'newdir'.  If not found in 'newdir'
+#  it was deleted in in the 'newdir' buid.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 for key in reference.keys() :
 	if not key in new.keys() :
@@ -325,7 +332,7 @@ for key in reference.keys() :
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Summarize the analysis
+#  Summarize the analysis
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 prt( "INFO: Files in directory {} = {}".format( args.newdir, len(new) ) )
 prt( "INFO: Files same between refdir and newdir = {}".format( len(same) ) )
@@ -334,10 +341,6 @@ prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
 prt( "DEBUG: Check: {} - {} - {} - {} = {}\n\n".format( len(new), len(same), len(changed), len(added), len(new) - len(same) - len(changed) - len(added) ) )
 # prt( "DEBUG: check = {}".format( len(new) - len(same) - len(changed) - len(added) ) )
 
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Summarize the analysis
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 prt( "INFO: Files missing from install relative to refdir = {}".format( len(missing) ) )
 prt( "INFO: These will have to be investigated.  This is unusual and potentially problematic." )
 for filename in missing :
@@ -345,7 +348,9 @@ for filename in missing :
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Print the lists we compiled above.
+#  Print the lists we compiled above.
+#
+#  Files in this list should not be replaced blindly.  Use diff or WinMerge to compare.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
@@ -356,6 +361,9 @@ for filename in local_mod :
 	prt( "          *  {}\n".format( os.path.join( args.install, filename ) ) )
 
 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#  These files should be replaced, EXCEPT if they have been modified.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
 prt( "INFO: These *potentially* might be replaced in install. Check for WARNINGs." )
@@ -369,6 +377,9 @@ for filename in changed :
 				os.path.dirname( os.path.join( args.install, filename ) ) ) )
 
 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#  These files should be added, but again ... EXCEPT if they have been modified.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
 prt( "INFO: These *potentially* may be copied in install, if they don't already exist (unusual)." )
@@ -386,6 +397,10 @@ for filename in added :
 
 
 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#  These file should be deleted so they don't accumulate.
+#  NOTE: Already accumulated but unnecessary files from before refdir aren't detected.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
 prt( "INFO: These *potentially* may be deleted from install.  Verify that they are not referenced by anything." )
@@ -398,8 +413,10 @@ for filename in deleted :
 		prt( "WARNING:          {} does NOT exist in install\n".format( filename ) )
 
 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#  Summarize the analysis again as we wrap-up.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
-
 prt( "INFO: Summary:" )
 prt( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
 prt( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
@@ -407,6 +424,9 @@ prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
 prt( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
 
 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#  Confirmation that the right commands where used if --script was specified.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 if script_type == "none" :
 	prt( "INFO: script output is off" )
