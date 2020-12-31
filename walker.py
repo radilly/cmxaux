@@ -37,6 +37,8 @@
 #       Could we use patching to copy local updates to an install image??
 #
 # ----------------------------------------------------------------------------------------
+# 20201231 While testing on Windows I had trouble with path_only(), and it suddenly
+#          dawned on me that os.path already has dirname() which handles that.
 # 20201224 Not technically necessary, but typically when copying a file the file name
 #          isn't given on the destination, just the path.
 # 20201221 The --script flag was added.  By default this prints a report. The --script
@@ -127,20 +129,6 @@ def add_to_list( list_name, value_str ) :
 
 	if not value_str in list_name :
 		list_name.append( value_str )
-
-
-
-
-# ----------------------------------------------------------------------------------------
-# Given a file path, i.e. path + file name, it returns just the path.
-#    Assumes you've pass a file path + name, and we use the separator for this OS.
-#
-# ----------------------------------------------------------------------------------------
-def path_only( file_path ) :
-
-        return re.sub("{}[^{}]*$".format( sep, sep ), sep, file_path )
-
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -378,7 +366,7 @@ for filename in changed :
 	else :
 		if script_out :
 			print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
-				path_only( os.path.join( args.install, filename ) ) ) )
+				os.path.dirname( os.path.join( args.install, filename ) ) ) )
 
 
 print( "\n" )
@@ -394,7 +382,7 @@ for filename in added :
 	else :
 		if script_out :
 			print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
-				path_only( os.path.join( args.install, filename ) ) ) )
+				os.path.dirname( os.path.join( args.install, filename ) ) ) )
 
 
 
