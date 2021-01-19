@@ -40,6 +40,8 @@
 #       Could we use patching to copy local updates to an install image??
 #
 # ----------------------------------------------------------------------------------------
+# 20210119 Build a separate dictionary for new/changed files under 'webfiles/". These
+#          should be updated on your web server / host.
 # 20201231 While testing on Windows I had trouble with path_only(), and it suddenly
 #          dawned on me that os.path already has dirname() which handles that.
 # 20201226 Cleaned up the description above.
@@ -98,6 +100,7 @@ prt_prefix = ""
 script_type = "none"
 
 merged = []
+webfiles = {}
 
 # These dictionaries will accumulate the MD5 signatures and sizes of files
 # for files in the directoies specified as parameters to this script.
@@ -237,16 +240,18 @@ args = parser.parse_args()
 
 script_type = args.script
 if script_type == "none" :
-	prt( "INFO: script output is off\n" )
+	prt( "INFO: script output is set to \"{}\"\n".format( script_type ) )
 else :
 	script_out = True
 	prt_prefix = comment[ script_type ]
 
-prt( "INFO: script output is set to \"{}\"\n".format(args.script) )
+# prt( "INFO: script output is set to \"{}\"\n".format(args.script) )
 
 # If we need the "join" character...
 dir_sep = os.path.join("x", "x")
 dir_sep = re.sub("x", "", dir_sep)
+webfiledir = "webfiles{}".format( dir_sep )
+
 
 
 prt( "INFO: Checking refdir  directory {}".format( args.refdir) )
@@ -354,7 +359,8 @@ for filename in missing :
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
-prt( "INFO: These will have to be inspected / compared." )
+if len(local_mod) > 0 :
+	prt( "INFO: These will have to be inspected / compared." )
 for filename in local_mod :
 	prt( "          {}".format( filename ) )
 	prt( "          *  {}".format( os.path.join( args.refdir, filename ) ) )
@@ -363,12 +369,18 @@ for filename in local_mod :
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #  These files should be replaced, EXCEPT if they have been modified.
+#  We also want to find any changed "webfiles".  These have to be uploaded
+#  to your webserver.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
-prt( "INFO: These *potentially* might be replaced in install. Check for WARNINGs." )
+if len(changed) > 0 :
+	prt( "INFO: These *potentially* might be replaced in install. Check for WARNINGs." )
 for filename in changed :
 	prt( "          {}".format( filename ) )
+	if webfiledir in filename :
+		prt( "WARNING:          {} changed and may need to be updated on your web server".format( filename ) )
+		add_member( webfiles, filename, "changed" )
 	if filename in local_mod :
 		prt( "WARNING:          {} was modified in install\n".format( filename ) )
 	else :
@@ -379,12 +391,18 @@ for filename in changed :
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #  These files should be added, but again ... EXCEPT if they have been modified.
+#  We also want to find any new "webfiles".  These have to be uploaded
+#  to your webserver.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
-prt( "INFO: These *potentially* may be copied in install, if they don't already exist (unusual)." )
+if len(added) > 0 :
+	prt( "INFO: These *potentially* may be copied in install, if they don't already exist (unusual)." )
 for filename in added :
 	prt( "          {}".format( filename ) )
+	if webfiledir in filename :
+		prt( "WARNING:          {} added and may need to be updated on your web server".format( filename ) )
+		add_member( webfiles, filename, "added" )
 	if filename in installed.keys() :
 		prt( "WARNING:          {} already exists in install".format( filename ) )
 		if filename in local_mod :
@@ -403,7 +421,8 @@ for filename in added :
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
-prt( "INFO: These *potentially* may be deleted from install.  Verify that they are not referenced by anything." )
+if len(deleted) > 0 :
+	prt( "INFO: These *potentially* may be deleted from install.  Verify that they are not referenced by anything." )
 for filename in deleted :
 	prt( "          {}".format( filename ) )
 	if filename in installed.keys() :
@@ -412,6 +431,22 @@ for filename in deleted :
 	else :
 		prt( "WARNING:          {} does NOT exist in install\n".format( filename ) )
 
+
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#  These file should be deleted so they don't accumulate.
+#  NOTE: Already accumulated but unnecessary files from before refdir aren't detected.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+if len( webfiles ) > 0 :
+	print( "\n" )
+	prt( "INFO: Files changed or added in newdir under webfiles directory = {}".format( len(webfiles) ) )
+	prt( "INFO: These files may need to be updated on your webserver." )
+
+	prt( "            status file path" )
+	prt( "          -------- ----------------------" )
+	for filename in webfiles :
+		prt( "          {:>8} {}".format( webfiles[filename], filename ) )
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #  Summarize the analysis again as we wrap-up.
@@ -427,12 +462,12 @@ prt( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #  Confirmation that the right commands where used if --script was specified.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-print( "\n" )
-if script_type == "none" :
-	prt( "INFO: script output is off" )
-else :
-	prt( "DEBUG: copy command = {}".format( copy[ script_type ] ) )
-	prt( "DEBUG: remove command = {}".format( remove[ script_type ] ) )
+# print( "\n" )
+# if script_type == "none" :
+#	prt( "INFO: script output is off" )
+# else :
+#	prt( "DEBUG: copy command = {}".format( copy[ script_type ] ) )
+#	prt( "DEBUG: remove command = {}".format( remove[ script_type ] ) )
 
 exit()
 
