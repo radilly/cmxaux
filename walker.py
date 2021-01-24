@@ -40,7 +40,9 @@
 #       Could we use patching to copy local updates to an install image??
 #
 # ----------------------------------------------------------------------------------------
-# 20210119 Build a separate dictionary for new/changed files under 'webfiles/". These
+# 20210123 Make the install directory optional.  If omitted this script reports on
+#          the differences between 2 build directories.
+# 20210119 Build a separate dictionary for new/changed files under "webfiles/". These
 #          should be updated on your web server / host.
 # 20201231 While testing on Windows I had trouble with path_only(), and it suddenly
 #          dawned on me that os.path already has dirname() which handles that.
@@ -229,14 +231,36 @@ def prt( text ) :
 #      These probably need to examimed manually.
 #
 # https://docs.python.org/3/library/argparse.html
+# https://docs.python.org/3/library/argparse.html#formatter-class
 # ----------------------------------------------------------------------------------------
-parser = argparse.ArgumentParser(description="This assists in updating an existing Cumulus MX installation.")
+parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+description='''
+This assists in updating an existing Cumulus MX installation.
+By default it writes a report to stdout.
+Optionally it will output script commands interspersed with the report as commentary.
+ 
+This use this properly, the distribution which matches your current install should
+be available as a reference.  While staying current with releases is recommended,
+this script should work if you've skipped some builds.
+''',
+epilog='''
+The --script is really only useful if an install directory is specified.
+If you use the --script feature, please check the report / commentary for "WARNING"
+messages.  The script will generally not fully complete an update, particualrly if you've
+modified anything.  It is likely you will have to take additional actions to fully update.
+''')
 parser.add_argument("refdir", help="Path to the directory we will use as the reference version; the installed version as-shipped.")
-parser.add_argument("newdir", help="Path to the directory with the new version.")
-parser.add_argument("install", help="Path to the installed directory which is to be updated (from the version in refdir).")
+parser.add_argument("newdir", help="Path to the directory with the new (to-be-installed) version.")
+# Make install directory argument optional
+parser.add_argument("install", nargs='?', help="(Optional) Path to the installed directory which is to be updated (from the version in newdir).")
 parser.add_argument("--script", help="Generate output in script format.", choices=['dos', 'bash'], default="none")
 args = parser.parse_args()
 
+# Was a third directory specified?
+if args.install is None :
+	ck_install = False
+else :
+	ck_install = True
 
 script_type = args.script
 if script_type == "none" :
@@ -268,16 +292,18 @@ walk_tree( args.newdir, new, False )
 ### dump_tree( new )
 # DEBUG: prt( "\n\n\n" )
 
-prt( "INFO: Checking install directory {}".format( args.install) )
-walk_tree( args.install, installed, True )
+if ck_install :
+	prt( "INFO: Checking install directory {}".format( args.install) )
+	walk_tree( args.install, installed, True )
 
 print( "\n" )
 
 prt( "INFO: Summary:" )
 prt( "INFO: Found {} files in directory {}".format( len(reference), args.refdir ) )
 prt( "INFO: Found {} files in directory {}".format( len(new), args.newdir ) )
-prt( "INFO: Found {} files in directory {}".format( len(installed), args.install ) )
-prt( "INFO: Accumulated MD5 checksums for {} files in {}".format( len(merged), args.install ) )
+if ck_install :
+	prt( "INFO: Found {} files in directory {}".format( len(installed), args.install ) )
+	prt( "INFO: Accumulated MD5 checksums for {} files in {}".format( len(merged), args.install ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -302,12 +328,13 @@ prt( "INFO: Analysis:\n" )
 #  These probably have to be looked at by hand... and should not be overlayedi blindly.
 #   There is a patching facility in Linux, but I've never used it.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-for key in reference.keys() :
-	if key in installed.keys() :
-		if installed[key] != reference[key] :
-			local_mod.append( key )
-	else :
-		missing.append( key )
+if ck_install :
+	for key in reference.keys() :
+		if key in installed.keys() :
+			if installed[key] != reference[key] :
+				local_mod.append( key )
+		else :
+			missing.append( key )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -343,13 +370,15 @@ prt( "INFO: Files in directory {} = {}".format( args.newdir, len(new) ) )
 prt( "INFO: Files same between refdir and newdir = {}".format( len(same) ) )
 prt( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
 prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
-prt( "DEBUG: Check: {} - {} - {} - {} = {}\n\n".format( len(new), len(same), len(changed), len(added), len(new) - len(same) - len(changed) - len(added) ) )
+prt( "DEBUG: Check: {} - {} - {} - {} = {} (0 expected)\n\n".format( len(new), len(same), len(changed), len(added), len(new) - len(same) - len(changed) - len(added) ) )
 # prt( "DEBUG: check = {}".format( len(new) - len(same) - len(changed) - len(added) ) )
 
-prt( "INFO: Files missing from install relative to refdir = {}".format( len(missing) ) )
-prt( "INFO: These will have to be investigated.  This is unusual and potentially problematic." )
-for filename in missing :
-	prt( "          {}".format( filename ) )
+if ck_install :
+	prt( "INFO: Files missing from install relative to refdir = {}".format( len(missing) ) )
+	if len(missing) > 0 :
+		prt( "INFO: These will have to be investigated.  This is unusual and potentially problematic." )
+		for filename in missing :
+			prt( "          {}".format( filename ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -357,14 +386,15 @@ for filename in missing :
 #
 #  Files in this list should not be replaced blindly.  Use diff or WinMerge to compare.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-print( "\n" )
-prt( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
-if len(local_mod) > 0 :
-	prt( "INFO: These will have to be inspected / compared." )
-for filename in local_mod :
-	prt( "          {}".format( filename ) )
-	prt( "          *  {}".format( os.path.join( args.refdir, filename ) ) )
-	prt( "          *  {}\n".format( os.path.join( args.install, filename ) ) )
+if ck_install :
+	print( "\n" )
+	prt( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
+	if len(local_mod) > 0 :
+		prt( "INFO: These will have to be inspected / compared." )
+		for filename in local_mod :
+			prt( "          {}".format( filename ) )
+			prt( "          *  {}".format( os.path.join( args.refdir, filename ) ) )
+			prt( "          *  {}\n".format( os.path.join( args.install, filename ) ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -374,19 +404,21 @@ for filename in local_mod :
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
-if len(changed) > 0 :
+if ck_install and len(changed) > 0 :
 	prt( "INFO: These *potentially* might be replaced in install. Check for WARNINGs." )
 for filename in changed :
 	prt( "          {}".format( filename ) )
 	if webfiledir in filename :
-		prt( "WARNING:          {} changed and may need to be updated on your web server".format( filename ) )
+		if ck_install :
+			prt( "WARNING:          {} changed and may need to be updated on your web server".format( filename ) )
 		add_member( webfiles, filename, "changed" )
-	if filename in local_mod :
-		prt( "WARNING:          {} was modified in install\n".format( filename ) )
-	else :
-		if script_out :
-			print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
-				os.path.dirname( os.path.join( args.install, filename ) ) ) )
+	if ck_install :
+		if filename in local_mod :
+			prt( "WARNING:          {} was modified in install\n".format( filename ) )
+		else :
+			if script_out :
+				print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
+					os.path.dirname( os.path.join( args.install, filename ) ) ) )
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -396,22 +428,23 @@ for filename in changed :
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
-if len(added) > 0 :
+if ck_install and len(added) > 0 :
 	prt( "INFO: These *potentially* may be copied in install, if they don't already exist (unusual)." )
 for filename in added :
 	prt( "          {}".format( filename ) )
 	if webfiledir in filename :
 		prt( "WARNING:          {} added and may need to be updated on your web server".format( filename ) )
 		add_member( webfiles, filename, "added" )
-	if filename in installed.keys() :
-		prt( "WARNING:          {} already exists in install".format( filename ) )
-		if filename in local_mod :
-			prt( "WARNING:          {} was also modified in install".format( filename ) )
-		print( "" )
-	else :
-		if script_out :
-			print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
-				os.path.dirname( os.path.join( args.install, filename ) ) ) )
+	if ck_install :
+		if filename in installed.keys() :
+			prt( "WARNING:          {} already exists in install".format( filename ) )
+			if filename in local_mod :
+				prt( "WARNING:          {} was also modified in install".format( filename ) )
+			print( "" )
+		else :
+			if script_out :
+				print( "{} {} {}".format( copy[script_type], os.path.join( args.newdir, filename ),
+					os.path.dirname( os.path.join( args.install, filename ) ) ) )
 
 
 
@@ -421,15 +454,16 @@ for filename in added :
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
-if len(deleted) > 0 :
+if ck_install and len(deleted) > 0 :
 	prt( "INFO: These *potentially* may be deleted from install.  Verify that they are not referenced by anything." )
 for filename in deleted :
 	prt( "          {}".format( filename ) )
-	if filename in installed.keys() :
-		if script_out :
-			print( "{} {}".format( remove[script_type], os.path.join( args.install, filename ) ) )
-	else :
-		prt( "WARNING:          {} does NOT exist in install\n".format( filename ) )
+	if ck_install :
+		if filename in installed.keys() :
+			if script_out :
+				print( "{} {}".format( remove[script_type], os.path.join( args.install, filename ) ) )
+		else :
+			prt( "WARNING:          {} does NOT exist in install\n".format( filename ) )
 
 
 
@@ -453,7 +487,8 @@ if len( webfiles ) > 0 :
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 print( "\n" )
 prt( "INFO: Summary:" )
-prt( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
+if ck_install :
+	prt( "INFO: Files modified in install relative to refdir = {}".format( len(local_mod) ) )
 prt( "INFO: Files changed between refdir and newdir = {}".format( len(changed) ) )
 prt( "INFO: Files added between refdir and newdir = {}".format( len(added) ) )
 prt( "INFO: Files deleted in newdir = {}".format( len(deleted) ) )
