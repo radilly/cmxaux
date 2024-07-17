@@ -13,6 +13,9 @@ DEST="/target/server/dir"
 
 exit
 
+# If needed, consider --files-from=FILE
+# See https://stackoverflow.com/questions/16647476/how-to-rsync-only-a-specific-list-of-files
+#
 
 
 
